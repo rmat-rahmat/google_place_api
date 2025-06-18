@@ -4,18 +4,20 @@ import {
     ActivityIndicator,
     StyleSheet,
     Dimensions,
+    Alert,
+    Text,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import RecentHistory from '../components/RecentHistory';
 import SearchBar from '../components/SearchBar';
 import { usePlace } from '../context/PlaceContext';
+import useGooglePlaces from '../hooks/useGooglePlaces';
 
 // Constants
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
 /**
  * MapViewScreen displays a map, search bar, and recent search history.
@@ -27,13 +29,13 @@ export default function MapViewScreen() {
     const [region, setRegion] = useState(null);
     const [loading, setLoading] = useState(false);
     const [mapLoading, setMapLoading] = useState(true);
+    const [warning, setWarning] = useState('');
 
     // Context and navigation
     const {
         selectedPlace,
         setSelectedPlace,
         history,
-        setHistory,
         handleSelectPlace,
     } = usePlace();
     const mapRef = useRef(null);
@@ -41,24 +43,45 @@ export default function MapViewScreen() {
     const insets = useSafeAreaInsets();
     const navigation = useNavigation();
 
-    // On mount: get current location if no region or selected place
+    // Google Places hook
+    const { checkApiKey } = useGooglePlaces();
+
+    // On app init, check API key validity and show warning if needed
     useEffect(() => {
-        if (region === null && selectedPlace == null) getCurrentLocation();
-    }, [navigation]);
+        (async () => {
+            const warningMsg = await checkApiKey();
+            if (warningMsg) {
+                setWarning(warningMsg);
+                Alert.alert(
+                    "Google Maps API Key Error",
+                    warningMsg,
+                    [{ text: "OK" }],
+                    { cancelable: false }
+                );
+            } else {
+                setWarning('');
+            }
+        })();
+    }, []);
+
+    // On mount: get current location if no region or selected place and no warning
+    useEffect(() => {
+        if (!warning && region === null && selectedPlace == null) getCurrentLocation();
+    }, [navigation, warning]);
 
     /**
      * When selectedPlace changes, update map, marker, query, and region.
      */
     useFocusEffect(
         React.useCallback(() => {
-            if (selectedPlace) {
+            if (!warning && selectedPlace) {
                 setQuery(selectedPlace.name);
                 setRegion(selectedPlace.coords);
                 setLoading(false);
                 mapRef.current?.animateToRegion(selectedPlace.coords, 1000);
                 setTimeout(() => markerRef.current?.showCallout(), 1000);
             }
-        }, [selectedPlace])
+        }, [selectedPlace, warning])
     );
 
     /**
@@ -128,6 +151,10 @@ export default function MapViewScreen() {
                     region={region}
                     showsUserLocation
                     onMapReady={() => setMapLoading(false)}
+                    scrollEnabled={!warning} // <-- Disable map scroll if warning exists
+                    zoomEnabled={!warning}   // <-- Optionally disable zoom as well
+                    pitchEnabled={!warning}  // <-- Optionally disable pitch
+                    rotateEnabled={!warning} // <-- Optionally disable rotate
                 >
                     {selectedPlace && (
                         <Marker
@@ -140,25 +167,34 @@ export default function MapViewScreen() {
                 </MapView>
             )}
 
-            {/* Search bar */}
-            <SearchBar
-                query={query}
-                setQuery={setQuery}
-                loading={loading}
-                insets={insets}
-                styles={styles}
-                onSubmit={handleSearchSubmit}
-                onSelect={(item) => selectPlace(item.place_id, item.description)}
-            />
+            {/* Show warning message and disable search/history if warning exists */}
+            {warning ? (
+                <View style={[styles.warningPanel, { top: insets.top + 40 }]}>
+                    <Text style={styles.warningText}>{warning}</Text>
+                </View>
+            ) : (
+                <>
+                    {/* Search bar */}
+                    <SearchBar
+                        query={query}
+                        setQuery={setQuery}
+                        loading={loading}
+                        insets={insets}
+                        styles={styles}
+                        onSubmit={handleSearchSubmit}
+                        onSelect={(item) => selectPlace(item.place_id, item.description)}
+                    />
 
-            {/* Recent history section */}
-            <RecentHistory
-                limit={10}
-                history={history}
-                navigation={navigation}
-                onItemPress={onHistoryItemPress}
-                style={[styles.historyPanel, { paddingBottom: insets.bottom || 10 }]}
-            />
+                    {/* Recent history section */}
+                    <RecentHistory
+                        limit={10}
+                        history={history}
+                        navigation={navigation}
+                        onItemPress={onHistoryItemPress}
+                        style={[styles.historyPanel, { paddingBottom: insets.bottom || 10 }]}
+                    />
+                </>
+            )}
         </View>
     );
 }
@@ -181,5 +217,23 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: 'white',
         zIndex: 1,
+    },
+    warningPanel: {
+        position: 'absolute',
+        left: 20,
+        right: 20,
+        backgroundColor: '#fff3cd',
+        borderColor: '#ffeeba',
+        borderWidth: 1,
+        borderRadius: 8,
+        padding: 16,
+        alignItems: 'center',
+        zIndex: 10,
+        elevation: 5,
+    },
+    warningText: {
+        color: '#856404',
+        fontWeight: 'bold',
+        textAlign: 'center',
     },
 });

@@ -13,6 +13,12 @@ export function PlaceProvider({ children }) {
     const [history, setHistory] = useState([]);
 
     const { fetchPlaceDetails } = useGooglePlaces();
+    
+    // Load history once on initialization
+    useEffect(() => {
+        loadHistory();
+    }, []);
+
 
     /**
      * Save search history to local storage.
@@ -39,11 +45,6 @@ export function PlaceProvider({ children }) {
             console.warn('Error loading history:', err);
         }
     };
-
-    // Load history once on initialization
-    useEffect(() => {
-        loadHistory();
-    }, []);
 
     /**
      * Fetch place details, set as selected, and update history.

@@ -24,10 +24,11 @@ export default function SearchListScreen() {
 
   // State for search results
   const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState([]);
 
   // Context and Google Places hook
   const { handleSelectPlace } = usePlace();
-  const { loading, searchPlacesGlobally, getPhotoUrl } = useGooglePlaces();
+  const {  searchPlacesGlobally, getPhotoUrl } = useGooglePlaces();
 
   /**
    * Fetch search results when the query changes.
@@ -41,8 +42,10 @@ export default function SearchListScreen() {
    * Fetch places globally using the Google Places API.
    */
   const fetchResults = async () => {
+    setLoading(true);
     const places = await searchPlacesGlobally(query);
     setResults(places);
+    setLoading(false);
   };
 
   /**
