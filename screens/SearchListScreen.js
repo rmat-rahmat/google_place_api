@@ -8,72 +8,55 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
-import { useNavigation, useRoute, CommonActions } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { usePlace } from '../context/PlaceContext';
+import useGooglePlaces from '../hooks/useGooglePlaces';
 
-const GOOGLE_API_KEY = 'AIzaSyCKzlA1LQpQre6lS3_EgyRpLr6vg56nUj4';
-
+/**
+ * SearchListScreen displays a list of places matching the search query.
+ * Allows users to select a place from the search results.
+ */
 export default function SearchListScreen() {
+  // Navigation and route hooks
   const navigation = useNavigation();
   const route = useRoute();
   const query = route.params?.query || '';
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
 
+  // State for search results
+  const [results, setResults] = useState([]);
+
+  // Context and Google Places hook
+  const { handleSelectPlace } = usePlace();
+  const { loading, searchPlacesGlobally, getPhotoUrl } = useGooglePlaces();
+
+  /**
+   * Fetch search results when the query changes.
+   */
   useEffect(() => {
-    if (query) searchPlacesGlobally();
+    if (query) fetchResults();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
-  const searchPlacesGlobally = async () => {
-    setLoading(true);
-    const wildcardQuery = `${query}*`;
-    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(
-      wildcardQuery
-    )}&key=${GOOGLE_API_KEY}`;
-
-    try {
-      const res = await fetch(url);
-      const json = await res.json();
-      if (json.status === 'OK') {
-        setResults(json.results);
-      } else {
-        setResults([]);
-      }
-    } catch (error) {
-      console.error('Search error:', error);
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
+  /**
+   * Fetch places globally using the Google Places API.
+   */
+  const fetchResults = async () => {
+    const places = await searchPlacesGlobally(query);
+    setResults(places);
   };
 
-  const handleSelect = (item) => {
-    const coords = {
-      latitude: item.geometry.location.lat,
-      longitude: item.geometry.location.lng,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    };
-
-    const selectedPlaceFromSearch = {
-      name: item.name,
-      address: item.formatted_address,
-      coords,
-      place_id: item.place_id,
-    };
-
-    navigation.dispatch(
-      CommonActions.reset({
-        index: 0,
-        routes: [
-          {
-            name: 'Home',
-            params: { selectedPlaceFromSearch },
-          },
-        ],
-      })
-    );
+  /**
+   * Handle selecting a place from the search results.
+   * @param {Object} item - The selected place object.
+   */
+  const handleSelect = async (item) => {
+    await handleSelectPlace({
+      placeId: item.place_id,
+    });
+    navigation.goBack();
   };
 
+  // Show loading indicator while fetching
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -82,6 +65,7 @@ export default function SearchListScreen() {
     );
   }
 
+  // Show message if no results found
   if (!results.length) {
     return (
       <View style={styles.centered}>
@@ -90,6 +74,7 @@ export default function SearchListScreen() {
     );
   }
 
+  // Render search results list
   return (
     <FlatList
       data={results}
@@ -99,7 +84,7 @@ export default function SearchListScreen() {
           {item.photos && item.photos.length > 0 ? (
             <Image
               source={{
-                uri: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photoreference=${item.photos[0].photo_reference}&key=${GOOGLE_API_KEY}`,
+                uri: getPhotoUrl(item.photos[0].photo_reference),
               }}
               style={styles.image}
             />

@@ -1,50 +1,44 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Alert, StyleSheet,Image } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation,CommonActions } from '@react-navigation/native';
+import React, { useState } from 'react';
+import { View, Text, FlatList, TouchableOpacity, Alert, StyleSheet, Image } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePlace } from '../context/PlaceContext';
+import useGooglePlaces from '../hooks/useGooglePlaces';
 
-const GOOGLE_API_KEY = 'AIzaSyCKzlA1LQpQre6lS3_EgyRpLr6vg56nUj4';
-
+/**
+ * SearchHistoryScreen displays a list of recently searched places.
+ * Allows users to select, multi-select, delete, or clear search history.
+ */
 export default function SearchHistoryScreen() {
-  const [history, setHistory] = useState([]);
+  // State for selection mode and selected items
   const [selectedItems, setSelectedItems] = useState([]);
   const [selectionMode, setSelectionMode] = useState(false);
+
+  // Hooks
   const navigation = useNavigation();
-    const insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
+  const { handleSelectPlace, clearHistory: contextClearHistory, deleteHistory, history } = usePlace();
+  const { getPhotoUrl } = useGooglePlaces();
 
-  useEffect(() => {
-    loadHistory();
-  }, []);
-
-  const loadHistory = async () => {
-    try {
-      const saved = await AsyncStorage.getItem('searchHistory');
-      if (saved) setHistory(JSON.parse(saved));
-    } catch (err) {
-      console.warn('Error loading history:', err);
-    }
-  };
-
-  const deleteItem = async (place_id) => {
-    const updated = history.filter((item) => item.place_id !== place_id);
-    setHistory(updated);
-    await AsyncStorage.setItem('searchHistory', JSON.stringify(updated));
-  };
-
-  const clearHistory = async () => {
+  /**
+   * Show confirmation dialog and clear all history if confirmed.
+   */
+  const clearHistoryLocal = async () => {
     Alert.alert('Clear All History', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel'},
+      { text: 'Cancel', style: 'cancel' },
       {
         text: 'Clear', onPress: async () => {
-          await AsyncStorage.removeItem('searchHistory');
-          setHistory([]);
+          contextClearHistory();
         }, style: 'destructive'
       }
     ]);
   };
 
+  /**
+   * Toggle selection of a place in multi-select mode.
+   * @param {string} place_id
+   */
   const toggleSelect = (place_id) => {
     if (selectedItems.includes(place_id)) {
       setSelectedItems(selectedItems.filter((id) => id !== place_id));
@@ -53,41 +47,37 @@ export default function SearchHistoryScreen() {
     }
   };
 
+  /**
+   * Delete all selected places from history.
+   */
   const deleteSelected = async () => {
-    const filtered = history.filter((item) => !selectedItems.includes(item.place_id));
-    setHistory(filtered);
-    await AsyncStorage.setItem('searchHistory', JSON.stringify(filtered));
+    deleteHistory(selectedItems);
     setSelectedItems([]);
     setSelectionMode(false);
   };
+
+  /**
+   * Exit multi-select mode and clear selection.
+   */
   const exitSelectionMode = () => {
     setSelectionMode(false);
     setSelectedItems([]);
   };
 
-  
-   const handleSelect = (item) => {
-    
-    const selectedPlaceFromSearch = {
-      name: item.name,
-      address: item.formatted_address,
-      coords:item.coords,
-      place_id: item.place_id,
-    };
-  
-    navigation.dispatch(
-      CommonActions.reset({
-        index: 0,
-        routes: [
-          {
-            name: 'Home',
-            params: { selectedPlaceFromSearch },
-          },
-        ],
-      })
-    );
+  /**
+   * Handle selecting a place from history.
+   * @param {Object} item
+   */
+  const handleSelect = async (item) => {
+    await handleSelectPlace({
+      placeId: item.place_id,
+    });
+    navigation.goBack();
   };
 
+  /**
+   * Render a single history item row.
+   */
   const renderItem = ({ item }) => (
     <TouchableOpacity
       style={[styles.item, selectedItems.includes(item.place_id) && styles.itemSelected]}
@@ -96,25 +86,25 @@ export default function SearchHistoryScreen() {
         if (selectionMode) {
           toggleSelect(item.place_id);
         } else {
-        handleSelect(item);
+          handleSelect(item);
         }
       }}
     >
-        {item.photo_reference ? (
+      {item.photo_reference ? (
         <Image
           source={{
-            uri: `https://maps.googleapis.com/maps/api/place/photo?maxwidth=100&photoreference=${item.photo_reference}&key=${GOOGLE_API_KEY}`,
+            uri: getPhotoUrl(item.photo_reference, 100),
           }}
           style={styles.image}
         />
       ) : (
-        <View style={[styles.image, { backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center' }]}> 
+        <View style={[styles.image, { backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center' }]}>
           <Ionicons name="image" size={24} color="#999" />
         </View>
       )}
       <View style={{ flex: 1, marginLeft: 10 }}>
-      <Text style={styles.name}>{item.name}</Text>
-      <Text style={styles.address}>{item.address}</Text>
+        <Text style={styles.name}>{item.name}</Text>
+        <Text style={styles.address}>{item.address}</Text>
       </View>
       {selectionMode ? (
         <Ionicons
@@ -124,7 +114,7 @@ export default function SearchHistoryScreen() {
         />
       ) : (
         <TouchableOpacity
-          onPress={() => deleteItem(item.place_id)}
+          onPress={() => deleteHistory([item.place_id])}
         >
           <Ionicons name="trash" size={20} color="red" />
         </TouchableOpacity>
@@ -134,6 +124,7 @@ export default function SearchHistoryScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Selection bar for multi-select actions */}
       {selectionMode && (
         <View style={styles.selectionBar}>
           <TouchableOpacity onPress={deleteSelected} style={styles.selectionButton}>
@@ -145,6 +136,7 @@ export default function SearchHistoryScreen() {
         </View>
       )}
 
+      {/* List of history items */}
       <FlatList
         data={history}
         keyExtractor={(item) => item.place_id}
@@ -152,7 +144,8 @@ export default function SearchHistoryScreen() {
         contentContainerStyle={{ paddingBottom: 80 }}
       />
 
-      <TouchableOpacity style={[styles.clearButton,{ marginBottom: insets.bottom || 10 }]} onPress={clearHistory}>
+      {/* Clear all history button */}
+      <TouchableOpacity style={[styles.clearButton, { marginBottom: insets.bottom || 10 }]} onPress={clearHistoryLocal}>
         <Text style={styles.clearText}>Clear History</Text>
       </TouchableOpacity>
     </View>
