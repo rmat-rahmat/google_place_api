@@ -2,11 +2,12 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, } from 'react';
 
 import { StyleSheet, Text, View } from 'react-native';
-import MapViewScreen from './components/MapViewScreen';
+import MapViewScreen from './screens/MapViewScreen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import SearchListScreen from './components/SearchListScreen'; // Assuming you have a SearchListScreen component
+import SearchListScreen from './screens/SearchListScreen'; // Assuming you have a SearchListScreen component
+import SearchHistoryScreen from './screens/SearchHistoryScreen'; // Assuming you have a SearchHistoryScreen component
 
 
 
@@ -20,7 +21,8 @@ export default function App() {
       <NavigationContainer>
        <Stack.Navigator>
       <Stack.Screen name="Home" component={MapViewScreen} options={{headerShown:false}} />
-      <Stack.Screen name="SearchList" component={SearchListScreen} />
+      <Stack.Screen name="SearchList" component={SearchListScreen} options={{title:"Search Result"}} />
+      <Stack.Screen name="SearchHistory" component={SearchHistoryScreen} options={{title:"Search History"}} />
     </Stack.Navigator>
     </NavigationContainer>
       <StatusBar style="auto" />
