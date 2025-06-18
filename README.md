@@ -28,8 +28,6 @@ cd google_place_api
 ### 2. Install dependencies
 
 ```sh
-npx expo install
-# or
 npm install
 # or
 yarn install
