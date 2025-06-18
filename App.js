@@ -1,4 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, } from 'react';
+
 import { StyleSheet, Text, View } from 'react-native';
 import MapViewScreen from './components/MapViewScreen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -10,6 +12,9 @@ import SearchListScreen from './components/SearchListScreen'; // Assuming you ha
 
 const Stack = createNativeStackNavigator();
 export default function App() {
+  useEffect(() => {
+    console.log("environment variables", process.env.GOOGLE_MAPS_API_KEY);
+  }, []);
   return (
     <SafeAreaProvider>
       <NavigationContainer>

@@ -29,6 +29,7 @@ export default function MapViewScreen() {
   const [region, setRegion] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [mapLoading, setMapLoading] = useState(true);
   const mapRef = useRef(null);
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -165,8 +166,20 @@ export default function MapViewScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      {mapLoading && (
+        <View style={styles.mapLoadingOverlay}>
+          <ActivityIndicator size="large" color="#000" />
+        </View>
+      )}
+
       {region && (
-        <MapView ref={mapRef} style={StyleSheet.absoluteFill} region={region} showsUserLocation={true}>
+        <MapView
+          ref={mapRef}
+          style={StyleSheet.absoluteFill}
+          region={region}
+          showsUserLocation={true}
+          onMapReady={() => setMapLoading(false)}
+        >
           {selectedPlace && (
             <Marker
               coordinate={selectedPlace.coords}
@@ -260,5 +273,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderBottomColor: '#eee',
     borderBottomWidth: 1,
+  },
+  mapLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    zIndex: 1,
   },
 });
